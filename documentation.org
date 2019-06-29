@@ -1,0 +1,129 @@
+* Entities: ressource de tout le système (classes et fonctions)
+
+** User: client publique interragissant avec le ses box
+*** Permission: explicite les permissions de chaque User
+*** Role: hierarchie de Permissions récursives
+*** Group: hierarchie de User récursives
+
+** Box: client du SI capable de streamer
+
+*** Monitoring: mesures de l'utisation instantanée du système
+**** CPU: nombre processeur, charge par processeur, switch contexts
+**** RAM: quantité libre, utilisée, totale, SWAP
+**** ROM: quantité libre, utilisée, totale, vitesse lecture/écriture
+**** NET: vitesse download/upload par interface
+**** PROCESSUS: nom, PID, charge, état
+
+*** IoT
+
+** Activity: système de traçage de toutes les activitées du SI
+
+* Use Cases: logique d'utilisation
+** Login
+*** Signup: création d'un utilisateur
+*** Activate: activation d'un utilisateur
+*** Signin: connexion d'un utilisateur
+*** Me: récupération des infos d'un utilisation
+*** Create: création d'un utilisateur par un autre utilisateur
+*** Initialize: initalisation du mot de passe d'un utilisateur
+*** Update: mise à jour des infos d'un utilisateur
+*** CheckAutorizations: vérification des permissions d'un utilisateur
+*** ForgotPassword: demande de ré-initialisation du mot de passe d'un utilisateur
+*** CheckResetPassword: vérification d'une demande ré-initialisation du mot de passe
+*** ResetPassword: ré-initialisation du mot de passe d'un utilisateur
+*** Logout: déconnexion d'un utilisateur
+
+** Box: client externe du SI
+*** Create: ajout d'une nouvelle Box
+*** Read: recherche d'une Box
+*** Search: recherche de plusieurs Box
+*** Update: mise à jour d'une Box
+*** Stream: streaming des données en tempt réél d'une Box
+
+** Activity
+*** Create: Création d'une activité
+*** Read: recherche d'une activité
+*** Search: recherche de plusieurs activitées
+
+* Interfaces & Adaptaters: abstraction des dépeandances
+
+** Gateway: passerelle entre les données reçues de l'extérieur du SI aux Entities et des UseCases
+*** UserGateway
+*** BoxGateway
+*** ActivityGateway
+
+** Controller: lie paramètres reçues aux Gateways, aux Entities et aux UseCases
+*** Login
+  *** Signup
+  *** Signin
+
+* Framework & Driver: systèmes d'intégration externes
+
+** Web (API HTTP): accès public du SI
+*** Login
+  *** POST /login/signup
+  *** POST /login/signin
+  *** GET /login/me
+  *** PUT /login/me
+  *** POST /login/forget
+  *** GET /login/reset?email=&token=
+  *** POST /login/reset
+  *** DELETE /login/logout
+
+*** User
+  *** POST /user
+  *** GET /user/:id
+  *** GET /users?
+  *** PUT /user/:id
+
+*** Box
+  *** POST /box
+  *** GET /box/:id
+  *** GET /boxes?
+  *** GET /box/:id/metrics
+  *** GET /box/:boxId/stream/:streamId/streaming
+  *** PUT /box/:id
+
+*** Activity
+  *** POST /activity
+  *** GET /activity/:id
+  *** GET /activities?
+  *** PUT /activity/:id
+
+** Database
+*** User
+  *** Create
+  *** Find
+  *** FindAll
+  *** Update
+
+*** Monitor
+  *** Create
+  *** Find
+  *** FindAll
+  *** Update
+
+*** Metric
+  *** Create
+  *** Find
+  *** FindAll
+  *** Update
+
+** Message Queue
+*** Login
+  *** Signin
+  *** HandleSignin
+  *** Signup
+  *** HandleSignup
+
+*** Monitor
+  *** CreateMonitor
+  *** HandleCreateMonitor
+  *** SendMetrics
+  *** HandleSendMetrics
+  *** FindMonitors
+  *** HandleFindMinitors
+  *** FindMetrics
+  *** HandleFindMetrics
+
+*** User
