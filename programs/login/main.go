@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/kukinsula/boxy/entity"
@@ -52,7 +55,13 @@ func main() {
 	passworder := usecase.NewPassworder(10)
 	login := loginUsecase.NewLogin(database.User, tokener, passworder)
 
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
 	go redisServer.HandleSignin(client, login)
 	go redisServer.HandleMe(client, login)
-	redisServer.HandleLogout(client, login)
+	go redisServer.HandleLogout(client, login)
+
+	<-signals
+	fmt.Println("Finished!")
 }

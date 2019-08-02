@@ -86,25 +86,14 @@ func (client *Client) Publish(channel Channel, data []byte) error {
 	return err
 }
 
-func (client *Client) Subscribe(
-	uuid string,
-	ctx context.Context,
-	channel Channel,
-	ping time.Duration,
-	logger entity.Logger) *Subscription {
-
-	return NewSusbcription(uuid, ctx, channel,
-		redis.PubSubConn{Conn: client.pool.Get()}, ping, logger)
-}
-
 func (client *Client) Request(req Request) (err error) {
-	ctx, cancel := context.WithCancel(req.Context)
 	failure := make(chan error)
-	subscription := client.Subscribe(
-		req.UUID, ctx, Channel(req.UUID), req.Ping, client.logger)
+	ctx, cancel := context.WithCancel(req.Context)
+	conn := client.pool.Get()
+	subscription := NewSusbcription(req.UUID, ctx, Channel(req.UUID), req.Ping, client.logger)
 
 	go func() {
-		failure <- subscription.Start()
+		failure <- subscription.Start(conn)
 		close(failure)
 	}()
 
@@ -113,6 +102,13 @@ func (client *Client) Request(req Request) (err error) {
 		case err = <-failure:
 
 		case <-subscription.Subscribed:
+			subscription.logger(entity.Log{
+				UUID:    subscription.UUID,
+				Level:   "debug",
+				Message: "REDIS subscribed",
+				Meta:    map[string]interface{}{"channel": subscription.channel},
+			})
+
 			err = client.request(req)
 
 		case data := <-subscription.Message:

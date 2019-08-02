@@ -13,7 +13,6 @@ type Subscription struct {
 	UUID       string
 	Context    context.Context
 	channel    Channel
-	pubsub     redis.PubSubConn
 	ping       time.Duration
 	logger     entity.Logger
 	Subscribed chan struct{}
@@ -24,7 +23,6 @@ func NewSusbcription(
 	uuid string,
 	ctx context.Context,
 	channel Channel,
-	pubsub redis.PubSubConn,
 	ping time.Duration,
 	logger entity.Logger) *Subscription {
 
@@ -32,7 +30,6 @@ func NewSusbcription(
 		UUID:       uuid,
 		Context:    ctx,
 		channel:    channel,
-		pubsub:     pubsub,
 		ping:       ping,
 		logger:     logger,
 		Subscribed: make(chan struct{}),
@@ -40,8 +37,9 @@ func NewSusbcription(
 	}
 }
 
-func (subscription *Subscription) Start() error {
-	err := subscription.pubsub.Subscribe(string(subscription.channel))
+func (subscription *Subscription) Start(conn redis.Conn) error {
+	pubsub := redis.PubSubConn{Conn: conn}
+	err := pubsub.Subscribe(string(subscription.channel))
 	if err != nil {
 		return err
 	}
@@ -50,7 +48,7 @@ func (subscription *Subscription) Start() error {
 	done := make(chan struct{})
 
 	go func() {
-		failure <- subscription.receive(done)
+		failure <- subscription.receive(pubsub, done)
 		close(failure)
 	}()
 
@@ -62,18 +60,16 @@ func (subscription *Subscription) Start() error {
 		case err = <-failure: // receive failed or ended
 
 		case <-ticker.C: // Connection health check
-			err = subscription.pubsub.Ping("")
+			err = pubsub.Ping("")
 
 		case <-subscription.Context.Done():
 			goOn = false
 		}
 	}
 
-	subscription.pubsub.Unsubscribe(string(subscription.channel))
-	subscription.pubsub.Close()
+	pubsub.Unsubscribe(string(subscription.channel))
 
 	<-done
-	close(done)
 
 	subscription.logger(entity.Log{
 		UUID:    subscription.UUID,
@@ -82,35 +78,28 @@ func (subscription *Subscription) Start() error {
 		Meta:    map[string]interface{}{"channel": subscription.channel},
 	})
 
+	conn.Close()
+
 	return err
 }
 
-func (subscription *Subscription) receive(done chan struct{}) error {
-	var err error
-
+func (subscription *Subscription) receive(pubsub redis.PubSubConn, done chan struct{}) (err error) {
 	for goOn := true; goOn; goOn = goOn && err == nil {
-		switch resp := subscription.pubsub.Receive().(type) {
+		switch result := pubsub.Receive().(type) {
 		case error:
-			err = resp
+			err = result
 
 		case redis.Subscription:
-			switch resp.Count {
+			switch result.Count {
 			case 0:
 				goOn = false
 
 			case 1:
 				subscription.Subscribed <- struct{}{}
-
-				subscription.logger(entity.Log{
-					UUID:    subscription.UUID,
-					Level:   "debug",
-					Message: "REDIS subscribed",
-					Meta:    map[string]interface{}{"channel": subscription.channel},
-				})
 			}
 
 		case redis.Message:
-			subscription.Message <- resp.Data
+			subscription.Message <- result.Data
 		}
 	}
 
@@ -118,6 +107,7 @@ func (subscription *Subscription) receive(done chan struct{}) error {
 	close(subscription.Message)
 
 	done <- struct{}{}
+	close(done)
 
 	return err
 }

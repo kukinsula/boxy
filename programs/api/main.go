@@ -28,7 +28,7 @@ func main() {
 	service := redisClient.NewService(client)
 	backend := server.NewBackend(service.Login)
 	api := server.NewAPI(server.Config{
-		Address: "127.0.0.1:8000",
+		Address: "127.0.0.1:9000",
 		Backend: backend,
 		Logger:  entity.StdoutLogger,
 	})
