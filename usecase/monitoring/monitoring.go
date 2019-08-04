@@ -7,19 +7,15 @@ import (
 )
 
 type MonitoringGateway interface {
-	Send(
-		cpu *monitoringEntity.CPU,
-		memory *monitoringEntity.Memory,
-		network *monitoringEntity.Network) error
+	Send(metrics *monitoringEntity.Metrics) error
 }
 
 type Monitoring struct {
 	Interval          int
 	monitoringGateway MonitoringGateway
-
-	cpu     *monitoringEntity.CPU
-	memory  *monitoringEntity.Memory
-	network *monitoringEntity.Network
+	cpu               *monitoringEntity.CPU
+	memory            *monitoringEntity.Memory
+	network           *monitoringEntity.Network
 }
 
 func NewMonitoring(monitoringGateway MonitoringGateway) *Monitoring {
@@ -34,16 +30,12 @@ func NewMonitoring(monitoringGateway MonitoringGateway) *Monitoring {
 
 func (monitoring *Monitoring) Start() error {
 	for {
-		err := monitoring.Update()
+		metrics, err := monitoring.Update()
 		if err != nil {
 			return err
 		}
 
-		err = monitoring.monitoringGateway.Send(
-			monitoring.cpu,
-			monitoring.memory,
-			monitoring.network)
-
+		err = monitoring.monitoringGateway.Send(metrics)
 		if err != nil {
 			return err
 		}
@@ -52,21 +44,25 @@ func (monitoring *Monitoring) Start() error {
 	}
 }
 
-func (monitoring *Monitoring) Update() error {
+func (monitoring *Monitoring) Update() (*monitoringEntity.Metrics, error) {
 	err := monitoring.cpu.Update()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = monitoring.memory.Update()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = monitoring.network.Update()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &monitoringEntity.Metrics{
+		CPU:     monitoring.cpu,
+		Memory:  monitoring.memory,
+		Network: monitoring.network,
+	}, nil
 }

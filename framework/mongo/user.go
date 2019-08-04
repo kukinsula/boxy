@@ -3,11 +3,15 @@ package mongo
 import (
 	"context"
 
-	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/log"
 	loginEntity "github.com/kukinsula/boxy/entity/login"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// TODO
+//
+// * transactions
 
 type UserModel struct {
 	*model
@@ -16,7 +20,7 @@ type UserModel struct {
 func NewUserModel(
 	ctx context.Context,
 	database *Database,
-	logger entity.Logger) (*UserModel, error) {
+	logger log.Logger) (*UserModel, error) {
 
 	model, err := newModel(modelParams{
 		Context:  ctx,

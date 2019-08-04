@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/log"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -22,7 +22,7 @@ type NewDatabaseParams struct {
 	URI      string
 	Database string
 	Timeout  time.Duration
-	Logger   entity.Logger
+	Logger   log.Logger
 }
 
 func NewDatabase(params NewDatabaseParams) (*Database, error) {

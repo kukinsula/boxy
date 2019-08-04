@@ -5,8 +5,10 @@ import (
 	"math"
 )
 
-type Metric interface {
-	Measure() interface{}
+type Metrics struct {
+	CPU     *CPU     `json:"cpu"`
+	Memory  *Memory  `json:"memory"`
+	Network *Network `json:"net"`
 }
 
 func checkSscanf(field string, err error, n, expected int) error {

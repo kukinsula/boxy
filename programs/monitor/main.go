@@ -2,16 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/kukinsula/boxy/entity/codec"
 	"github.com/kukinsula/boxy/entity/log"
-	"github.com/kukinsula/boxy/framework/api/server"
-	redis "github.com/kukinsula/boxy/framework/redis"
+	"github.com/kukinsula/boxy/framework/redis"
 	redisClient "github.com/kukinsula/boxy/framework/redis/client"
+	monitoringUsecase "github.com/kukinsula/boxy/usecase/monitoring"
 )
 
 func main() {
@@ -30,20 +27,8 @@ func main() {
 		return
 	}
 
-	service := redisClient.NewService(client)
-	backend := server.NewBackend(service.Login)
-	api := server.NewAPI(server.Config{
-		Address: "127.0.0.1:9000",
-		Backend: backend,
-		Logger:  logger,
-	})
+	gateway := redisClient.NewMonitoring(client)
+	monitoring := monitoringUsecase.NewMonitoring(gateway)
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-
-	go api.Run()
-
-	<-signals
-
-	fmt.Println("Finished!")
+	monitoring.Start()
 }

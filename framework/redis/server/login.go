@@ -13,7 +13,7 @@ func HandleSignin(
 
 	params := &loginUsecase.SigninParams{}
 
-	return client.Handle(redisFramework.Handler{
+	return client.Handle(&redisFramework.Handler{
 		Channel: redisFramework.LOGIN_SIGNIN,
 		Params:  params,
 		Handle: func(uuid string, ctx context.Context) (interface{}, error) {
@@ -26,13 +26,13 @@ func HandleMe(
 	client *redisFramework.Client,
 	login *loginUsecase.Login) error {
 
-	var token string
+	params := &loginUsecase.AccessTokenParams{}
 
-	return client.Handle(redisFramework.Handler{
+	return client.Handle(&redisFramework.Handler{
 		Channel: redisFramework.LOGIN_ME,
-		Params:  &token,
+		Params:  params,
 		Handle: func(uuid string, ctx context.Context) (interface{}, error) {
-			return login.Me(uuid, ctx, token)
+			return login.Me(uuid, ctx, params)
 		},
 	})
 }
@@ -41,13 +41,13 @@ func HandleLogout(
 	client *redisFramework.Client,
 	login *loginUsecase.Login) error {
 
-	var token string
+	params := &loginUsecase.AccessTokenParams{}
 
-	return client.Handle(redisFramework.Handler{
+	return client.Handle(&redisFramework.Handler{
 		Channel: redisFramework.LOGIN_LOGOUT,
-		Params:  &token,
+		Params:  params,
 		Handle: func(uuid string, ctx context.Context) (interface{}, error) {
-			return login.Logout(uuid, ctx, token)
+			return nil, login.Logout(uuid, ctx, params)
 		},
 	})
 }

@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 
-	loginEntity "github.com/kukinsula/boxy/entity/login"
 	loginUsecase "github.com/kukinsula/boxy/usecase/login"
 )
 
@@ -18,18 +17,15 @@ func NewBackend(login LoginBackender) *Backend {
 }
 
 type LoginBackender interface {
-	Signin(
-		uuid string,
+	Signin(uuid string,
 		context context.Context,
-		params loginUsecase.SigninParams) (*loginEntity.User, error)
+		params loginUsecase.SigninParams) (*loginUsecase.SigninResult, error)
 
-	Me(
-		uuid string,
+	Me(uuid string,
 		context context.Context,
-		token string) (*loginEntity.User, error)
+		token string) (*loginUsecase.SigninResult, error)
 
-	Logout(
-		uuid string,
+	Logout(uuid string,
 		context context.Context,
-		token string) (*loginEntity.User, error)
+		token string) error
 }

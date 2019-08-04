@@ -12,12 +12,10 @@ func newMonitoringGatewayMock() *monitoringGatewayMock {
 	return &monitoringGatewayMock{}
 }
 
-func (gateway *monitoringGatewayMock) Send(
-	cpu *monitoringEntity.CPU,
-	memory *monitoringEntity.Memory,
-	network *monitoringEntity.Network) error {
+func (gateway *monitoringGatewayMock) Send(metrics *monitoringEntity.Metrics) error {
 
-	fmt.Printf("%s\n%s\n%s\n", cpu, memory, network)
+	fmt.Printf("%s\n%s\n%s\n",
+		metrics.CPU, metrics.Memory, metrics.Network)
 
 	return nil
 }

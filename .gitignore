@@ -4,3 +4,4 @@
 programs/api/api
 programs/cli/cli
 programs/login/login
+programs/monitor/monitor

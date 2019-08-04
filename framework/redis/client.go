@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/codec"
+	"github.com/kukinsula/boxy/entity/log"
 
 	"github.com/gomodule/redigo/redis"
 )
@@ -17,14 +19,14 @@ type Config struct {
 	MaxActive       int           `yaml:"max-active"`
 	IdleTimeout     time.Duration `yaml:"idle-timeout"`
 	MaxConnLifetime time.Duration `yaml:"max-conn-lifetime"`
-	Codec           Codec
-	Logger          entity.Logger
+	Codec           codec.Codec
+	Logger          log.Logger
 }
 
 type Client struct {
 	pool   *redis.Pool
-	codec  Codec
-	logger entity.Logger
+	codec  codec.Codec
+	logger log.Logger
 }
 
 type Request struct {
@@ -33,19 +35,24 @@ type Request struct {
 	Channel Channel
 	Ping    time.Duration
 	Params  interface{}
-	Result  interface{}
+}
+
+type Response struct {
+	Request *Request
+	data    []byte
+	Error   error
+	codec   codec.Codec
+	logger  log.Logger
 }
 
 type Handler struct {
 	Channel Channel
-	Params  interface{}
+	Params  Reseter // interface{}
 	Handle  func(uuid string, ctx context.Context) (interface{}, error)
 }
 
-// TODO: put into entity package
-type Codec interface {
-	Encode(data interface{}) ([]byte, error)
-	Decode(data []byte, v interface{}) error
+type Reseter interface {
+	Reset() error
 }
 
 func NewClient(config Config) (*Client, error) {
@@ -77,64 +84,67 @@ func (client *Client) Ping() (string, error) {
 	return redis.String(conn.Do("PING"))
 }
 
-func (client *Client) Publish(channel Channel, data []byte) error {
+func (client *Client) Publish(channel Channel, v interface{}) error {
+	data, err := client.codec.Encode(v)
+	if err != nil {
+		return err
+	}
+
 	conn := client.pool.Get()
 	defer conn.Close()
 
-	_, err := conn.Do("PUBLISH", string(channel), data)
+	_, err = conn.Do("PUBLISH", string(channel), data)
 
 	return err
 }
 
-func (client *Client) Request(req Request) (err error) {
+func (client *Client) Request(req *Request) *Response {
+	start := time.Now()
 	failure := make(chan error)
-	ctx, cancel := context.WithCancel(req.Context)
 	conn := client.pool.Get()
-	subscription := NewSusbcription(req.UUID, ctx, Channel(req.UUID), req.Ping, client.logger)
+	ctx, cancel := context.WithCancel(req.Context)
+	resp := &Response{Request: req, codec: client.codec, logger: client.logger}
+	subscription := NewSusbcription(req.UUID, ctx, Channel(req.UUID), req.Ping)
 
 	go func() {
 		failure <- subscription.Start(conn)
 		close(failure)
 	}()
 
+	var err error
+
 	for goOn := true; goOn; goOn = goOn && err == nil {
 		select {
 		case err = <-failure:
 
 		case <-subscription.Subscribed:
-			subscription.logger(entity.Log{
-				UUID:    subscription.UUID,
-				Level:   "debug",
-				Message: "REDIS subscribed",
-				Meta:    map[string]interface{}{"channel": subscription.channel},
-			})
-
-			err = client.request(req)
+			err = client.sendRequest(req)
 
 		case data := <-subscription.Message:
-			err = client.codec.Decode(data, req.Result)
+			resp.data = data
 
-			client.logger(entity.Log{
-				UUID:    req.UUID,
-				Level:   "debug",
-				Message: "REDIS <- request received a response",
-				Meta: map[string]interface{}{
-					"channel": req.Channel,
-					"result":  req.Result,
-					"error":   err,
-				},
-			})
-
-			cancel() // Cancels the subscription
+			// Cancels the subscription after the first message is received
+			cancel()
 
 			goOn = false
 		}
 	}
 
-	return err
+	client.logger(subscription.UUID, log.DEBUG,
+		"REDIS request finished",
+		map[string]interface{}{
+			"channel":  subscription.channel,
+			"duration": time.Since(start),
+		})
+
+	if err != nil {
+		resp.Error = err
+	}
+
+	return resp
 }
 
-func (client *Client) request(req Request) error {
+func (client *Client) sendRequest(req *Request) error {
 	conn := client.pool.Get()
 	defer conn.Close()
 
@@ -148,25 +158,19 @@ func (client *Client) request(req Request) error {
 		return err
 	}
 
-	payload := append(uuid, data...)
+	_, err = conn.Do("RPUSH", string(req.Channel), append(uuid, data...))
 
-	_, err = conn.Do("RPUSH", string(req.Channel), payload)
-
-	client.logger(entity.Log{
-		UUID:    req.UUID,
-		Level:   "debug",
-		Message: "REDIS RPUSH",
-		Meta: map[string]interface{}{
+	client.logger(req.UUID, log.DEBUG, "REDIS RPUSH",
+		map[string]interface{}{
 			"channel": req.Channel,
 			"params":  req.Params,
 			"error":   err,
-		},
-	})
+		})
 
 	return err
 }
 
-func (client *Client) Handle(handler Handler) (err error) {
+func (client *Client) Handle(handler *Handler) (err error) {
 	conn := client.pool.Get()
 
 	for err == nil {
@@ -190,19 +194,21 @@ func (client *Client) Handle(handler Handler) (err error) {
 			break
 		}
 
+		err = handler.Params.Reset()
+		if err != nil {
+			break
+		}
+
 		// Decode request parameters
 		err = client.codec.Decode(raw[responseIdLen:], handler.Params)
 
-		client.logger(entity.Log{
-			UUID:    requestId,
-			Level:   "debug",
-			Message: "REDIS BLOP received a request to handle",
-			Meta: map[string]interface{}{
+		client.logger(requestId, log.DEBUG,
+			"REDIS BLOP received a request to handle",
+			map[string]interface{}{
 				"channel": handler.Channel,
 				"params":  handler.Params,
 				"error":   err,
-			},
-		})
+			})
 
 		if err != nil {
 			break
@@ -214,25 +220,15 @@ func (client *Client) Handle(handler Handler) (err error) {
 			break
 		}
 
-		// Encode the result of execution
-		data, err := client.codec.Encode(result)
-		if err != nil {
-			break
-		}
-
 		// Send the response
-		err = client.Publish(Channel(string(requestId)), data)
+		err = client.Publish(Channel(string(requestId)), result)
 
-		client.logger(entity.Log{
-			UUID:    requestId,
-			Level:   "debug",
-			Message: "REDIS PUBLISH response",
-			Meta: map[string]interface{}{
+		client.logger(requestId, log.DEBUG, "REDIS PUBLISH response",
+			map[string]interface{}{
 				"channel": handler.Channel,
 				"result":  result,
 				"error":   err,
-			},
-		})
+			})
 
 		if err != nil {
 			break
@@ -240,6 +236,24 @@ func (client *Client) Handle(handler Handler) (err error) {
 	}
 
 	conn.Close()
+
+	return err
+}
+
+func (resp *Response) Decode(result interface{}) error {
+	if resp.Error != nil {
+		return resp.Error
+	}
+
+	err := resp.codec.Decode(resp.data, result)
+
+	resp.logger(resp.Request.UUID, log.DEBUG,
+		"REDIS <- request received a response",
+		map[string]interface{}{
+			"channel": resp.Request.Channel,
+			"result":  result,
+			"error":   err,
+		})
 
 	return err
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/log"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,13 +20,13 @@ type Logger func(
 type Config struct {
 	Address string `yaml:"address"`
 	Backend *Backend
-	Logger  entity.Logger
+	Logger  log.Logger
 }
 
 type API struct {
 	config  Config
 	backend *Backend
-	logger  entity.Logger
+	logger  log.Logger
 	server  *http.Server
 	engine  *gin.Engine
 	done    chan error

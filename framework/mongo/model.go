@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -21,7 +22,7 @@ type modelParams struct {
 	Context  context.Context
 	Database *Database
 	Name     string
-	Logger   entity.Logger
+	Logger   log.Logger
 	Indexes  []indexParams
 }
 
@@ -72,15 +73,12 @@ func (model *model) createindex(
 
 	_, err := model.collection.Indexes().CreateOne(ctx, index, opts...)
 
-	model.params.Logger(entity.Log{
-		UUID:    uuid,
-		Level:   "debug",
-		Message: fmt.Sprintf("%s.EnsureIndex", model.params.Name),
-		Meta: map[string]interface{}{
+	model.params.Logger(uuid, log.DEBUG,
+		fmt.Sprintf("%s.EnsureIndex", model.params.Name),
+		map[string]interface{}{
 			"name":   *index.Options.Name,
 			"unique": *index.Options.Unique,
-		},
-	})
+		})
 
 	return err
 }
@@ -88,12 +86,9 @@ func (model *model) createindex(
 func (model *model) InsertOne(uuid string, ctx context.Context, data interface{}) error {
 	_, err := model.collection.InsertOne(ctx, data)
 
-	model.params.Logger(entity.Log{
-		UUID:    uuid,
-		Level:   "debug",
-		Message: fmt.Sprintf("%s.InsertOne", model.params.Name),
-		Meta:    map[string]interface{}{"data": data, "error": err},
-	})
+	model.params.Logger(uuid, log.DEBUG,
+		fmt.Sprintf("%s.InsertOne", model.params.Name),
+		map[string]interface{}{"data": data, "error": err})
 
 	return err
 }
@@ -108,17 +103,14 @@ func (model *model) FindOne(
 	opts := &options.FindOneOptions{Projection: projection}
 	err := model.collection.FindOne(ctx, conditions, opts).Decode(result)
 
-	model.params.Logger(entity.Log{
-		UUID:    uuid,
-		Level:   "debug",
-		Message: fmt.Sprintf("%s.FindOne", model.params.Name),
-		Meta: map[string]interface{}{
+	model.params.Logger(uuid, log.DEBUG,
+		fmt.Sprintf("%s.FindOne", model.params.Name),
+		map[string]interface{}{
 			"conditions": conditions,
 			"projection": projection,
 			"result":     result,
 			"error":      err,
-		},
-	})
+		})
 
 	return err
 }
@@ -139,16 +131,13 @@ func (model *model) UpdateOne(
 		return nil, fmt.Errorf("Model.UpdateOne failed: wrong number of Matched or Modified counts")
 	}
 
-	model.params.Logger(entity.Log{
-		UUID:    uuid,
-		Level:   "debug",
-		Message: fmt.Sprintf("%s.UpdateOne", model.params.Name),
-		Meta: map[string]interface{}{
+	model.params.Logger(uuid, log.DEBUG,
+		fmt.Sprintf("%s.UpdateOne", model.params.Name),
+		map[string]interface{}{
 			"conditions": conditions,
 			"update":     update,
 			"result":     result,
-		},
-	})
+		})
 
 	return result, nil
 }
@@ -168,12 +157,9 @@ func (model *model) DeleteOne(
 		return nil, fmt.Errorf("Model.DeleteOne failed: wrong number of Deleted counts")
 	}
 
-	model.params.Logger(entity.Log{
-		UUID:    uuid,
-		Level:   "debug",
-		Message: fmt.Sprintf("%s.DeleteOne", model.params.Name),
-		Meta:    map[string]interface{}{"conditions": conditions},
-	})
+	model.params.Logger(uuid, log.DEBUG,
+		fmt.Sprintf("%s.DeleteOne", model.params.Name),
+		map[string]interface{}{"conditions": conditions})
 
 	return result, nil
 }
@@ -189,12 +175,9 @@ func (model *model) DeleteMany(
 		return nil, err
 	}
 
-	model.params.Logger(entity.Log{
-		UUID:    uuid,
-		Level:   "debug",
-		Message: fmt.Sprintf("%s.DeleteMany", model.params.Name),
-		Meta:    map[string]interface{}{"conditions": conditions},
-	})
+	model.params.Logger(uuid, log.DEBUG,
+		fmt.Sprintf("%s.DeleteMany", model.params.Name),
+		map[string]interface{}{"conditions": conditions})
 
 	return result, nil
 }

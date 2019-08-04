@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/kukinsula/boxy/entity"
-
 	"github.com/gomodule/redigo/redis"
 )
 
@@ -14,7 +12,6 @@ type Subscription struct {
 	Context    context.Context
 	channel    Channel
 	ping       time.Duration
-	logger     entity.Logger
 	Subscribed chan struct{}
 	Message    chan []byte
 }
@@ -23,15 +20,13 @@ func NewSusbcription(
 	uuid string,
 	ctx context.Context,
 	channel Channel,
-	ping time.Duration,
-	logger entity.Logger) *Subscription {
+	ping time.Duration) *Subscription {
 
 	return &Subscription{
 		UUID:       uuid,
 		Context:    ctx,
 		channel:    channel,
 		ping:       ping,
-		logger:     logger,
 		Subscribed: make(chan struct{}),
 		Message:    make(chan []byte),
 	}
@@ -70,13 +65,6 @@ func (subscription *Subscription) Start(conn redis.Conn) error {
 	pubsub.Unsubscribe(string(subscription.channel))
 
 	<-done
-
-	subscription.logger(entity.Log{
-		UUID:    subscription.UUID,
-		Level:   "debug",
-		Message: "REDIS subscription ended",
-		Meta:    map[string]interface{}{"channel": subscription.channel},
-	})
 
 	conn.Close()
 

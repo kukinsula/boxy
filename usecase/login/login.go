@@ -9,11 +9,6 @@ import (
 	"github.com/kukinsula/boxy/usecase"
 )
 
-// TODO
-//
-// * Mongo:
-//   * transactions
-
 type LoginGateway interface {
 	Create(
 		uuid string,
@@ -182,12 +177,28 @@ type SigninParams struct {
 	Password string `json:"password"`
 }
 
+func (params *SigninParams) Reset() error {
+	params.Email = ""
+	params.Password = ""
+
+	return nil
+}
+
+func (params *SigninParams) String() string {
+	return fmt.Sprintf("Email: %s, Password: ******", params.Email)
+}
+
 type SigninResult struct {
 	UUID        string `json:"uuid""`
 	Email       string `json:"email"`
 	FirstName   string `json:"firstName"`
 	LastName    string `json:"lastName"`
 	AccessToken string `json:"access-token"`
+}
+
+func (result *SigninResult) String() string {
+	return fmt.Sprintf("UUID: %s, Email: %s, FirstName: %s, LastName: %s, AccessToken: %s",
+		result.UUID, result.Email, result.FirstName, result.LastName, result.AccessToken)
 }
 
 func (login *Login) Signin(
@@ -217,21 +228,40 @@ func (login *Login) Signin(
 		return nil, err
 	}
 
-	token, err := login.tokener.Generate(usecase.GenerateTokenParams{
-		Audience:  "Users",
-		ExpiresIn: time.Hour * 24,
-		Issuer:    "Login",
-		Subject:   "Signin",
-		Email:     params.Email,
-	})
+	if user.AccessToken != "" {
+		_, err = login.tokener.Verify(user.AccessToken)
+		if err != nil {
+			user.AccessToken, err = login.tokener.Generate(usecase.GenerateTokenParams{
+				Audience:  "Users",
+				ExpiresIn: time.Hour * 24,
+				Issuer:    "Login",
+				Subject:   "Signin",
+				Email:     params.Email,
+			})
 
-	if err != nil {
-		return nil, err
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		user.AccessToken, err = login.tokener.Generate(usecase.GenerateTokenParams{
+			Audience:  "Users",
+			ExpiresIn: time.Hour * 24,
+			Issuer:    "Login",
+			Subject:   "Signin",
+			Email:     params.Email,
+		})
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = login.loginGateway.Update(uuid, ctx,
 		map[string]interface{}{"uuid": user.UUID},
-		map[string]interface{}{"$set": map[string]interface{}{"accessToken": token}})
+		map[string]interface{}{"$set": map[string]interface{}{
+			"accessToken": user.AccessToken,
+		}})
 
 	if err != nil {
 		return nil, err
@@ -242,21 +272,31 @@ func (login *Login) Signin(
 		Email:       user.Email,
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
-		AccessToken: token,
+		AccessToken: user.AccessToken,
 	}, nil
+}
+
+type AccessTokenParams struct {
+	Token string `json:"token"`
+}
+
+func (params *AccessTokenParams) Reset() error {
+	params.Token = ""
+
+	return nil
 }
 
 func (login *Login) Me(
 	uuid string,
 	ctx context.Context,
-	token string) (*SigninResult, error) {
+	params *AccessTokenParams) (*SigninResult, error) {
 
-	_, err := login.tokener.Verify(token)
+	_, err := login.tokener.Verify(params.Token)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := login.loginGateway.FindByAccessToken(uuid, ctx, token,
+	user, err := login.loginGateway.FindByAccessToken(uuid, ctx, params.Token,
 		map[string]interface{}{
 			"uuid":      1,
 			"email":     1,
@@ -269,7 +309,8 @@ func (login *Login) Me(
 	}
 
 	if user == nil {
-		return nil, fmt.Errorf("Me failed: cannot find user with access token %s", token)
+		return nil, fmt.Errorf("Me failed: cannot find user with access token %s",
+			params.Token)
 	}
 
 	return &SigninResult{
@@ -277,7 +318,7 @@ func (login *Login) Me(
 		Email:       user.Email,
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
-		AccessToken: token,
+		AccessToken: params.Token,
 	}, nil
 }
 
@@ -388,22 +429,23 @@ func (login *Login) Initialize(
 func (login *Login) Logout(
 	uuid string,
 	ctx context.Context,
-	token string) (*loginEntity.User, error) {
+	params *AccessTokenParams) error {
 
-	_, err := login.tokener.Verify(token)
+	_, err := login.tokener.Verify(params.Token)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	user, err := login.loginGateway.FindByAccessToken(
-		uuid, ctx, token, loginEntity.UserFullProjection)
+		uuid, ctx, params.Token, loginEntity.UserFullProjection)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if user == nil {
-		return nil, fmt.Errorf("Logout failed: cannot find user with access token %s", token)
+		return fmt.Errorf("Logout failed: cannot find user with access token %s",
+			params.Token)
 	}
 
 	err = login.loginGateway.Update(uuid, ctx,
@@ -411,10 +453,10 @@ func (login *Login) Logout(
 		map[string]interface{}{"$unset": map[string]interface{}{"accessToken": 1}})
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	user.AccessToken = ""
 
-	return user, nil
+	return nil
 }

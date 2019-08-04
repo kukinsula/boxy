@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/log"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +19,7 @@ const (
 //
 // type Middleware func(*Context)
 
-func Welcome(logger entity.Logger) gin.HandlerFunc {
+func Welcome(logger log.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		start := time.Now()
 		uuid := getRequestUUID(ctx)
@@ -26,29 +27,21 @@ func Welcome(logger entity.Logger) gin.HandlerFunc {
 		ctx.Set("id", uuid)
 		ctx.Writer.Header().Set(X_REQUEST_ID, uuid)
 
-		logger(entity.Log{
-			UUID:    uuid,
-			Level:   "debug",
-			Message: "API <-",
-			Meta: map[string]interface{}{
+		logger(uuid, log.DEBUG, "API <-",
+			map[string]interface{}{
 				"method": ctx.Request.Method,
 				"path":   ctx.Request.URL.Path,
-			},
-		})
+			})
 
 		ctx.Next()
 
-		logger(entity.Log{
-			UUID:    uuid,
-			Level:   "debug",
-			Message: "API ->",
-			Meta: map[string]interface{}{
+		logger(uuid, log.DEBUG, "API ->",
+			map[string]interface{}{
 				"method":   ctx.Request.Method,
 				"path":     ctx.Request.URL.Path,
 				"status":   ctx.Writer.Status(),
 				"duration": time.Since(start),
-			},
-		})
+			})
 	}
 }
 

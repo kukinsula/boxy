@@ -8,7 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/codec"
+	"github.com/kukinsula/boxy/entity/log"
 	"github.com/kukinsula/boxy/framework/mongo"
 	redis "github.com/kukinsula/boxy/framework/redis"
 	redisServer "github.com/kukinsula/boxy/framework/redis/server"
@@ -17,13 +18,14 @@ import (
 )
 
 func main() {
+	logger := log.CleanMetaLogger(log.StdoutLogger)
 	client, err := redis.NewClient(redis.Config{
 		Address:     "127.0.0.1:6379",
 		MaxActive:   10,
 		MaxIdle:     5,
 		IdleTimeout: 200 * time.Second,
-		Codec:       &entity.JSONCodec{},
-		Logger:      entity.StdoutLogger,
+		Codec:       &codec.JSONCodec{},
+		Logger:      logger,
 	})
 
 	if err != nil {
@@ -36,7 +38,7 @@ func main() {
 		Context:  ctx,
 		URI:      "mongodb://localhost:27017",
 		Database: "boxy",
-		Logger:   entity.StdoutLogger,
+		Logger:   logger,
 	})
 
 	if err != nil {

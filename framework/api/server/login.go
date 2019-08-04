@@ -64,7 +64,7 @@ func Logout(login LoginBackender) gin.HandlerFunc {
 		}
 
 		uuid := getRequestUUID(ctx)
-		_, err := login.Logout(uuid, ctx, token)
+		err := login.Logout(uuid, ctx, token)
 		if err != nil {
 			ctx.JSON(500, gin.H{
 				"error": "LOGOUT_UNAVAILABLE",

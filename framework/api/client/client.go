@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/codec"
 )
 
 type Method string
@@ -33,7 +34,7 @@ type Request struct {
 	Path    string
 	Headers Headers
 	Query   Set
-	codec   Codec
+	codec   codec.Codec
 	Body    interface{}
 	body    io.ReadCloser
 }
@@ -43,15 +44,9 @@ type Response struct {
 	Status   int
 	Headers  Headers
 	Error    error
-	codec    Codec
+	codec    codec.Codec
 	body     io.ReadCloser
 	Duration time.Duration
-}
-
-// TODO: put into entity package (used by redis too)
-type Codec interface {
-	Encode(data interface{}) ([]byte, error)
-	Decode(data []byte, result interface{}) error
 }
 
 type Requester interface {
@@ -63,7 +58,7 @@ type ResponseLogger func(resp *Response)
 
 type client struct {
 	requester      Requester
-	codec          Codec
+	codec          codec.Codec
 	URL            string
 	requestLogger  RequestLogger
 	responseLogger ResponseLogger
@@ -72,7 +67,7 @@ type client struct {
 func newClient(
 	url string,
 	requester Requester,
-	codec Codec,
+	codec codec.Codec,
 	requestLogger RequestLogger,
 	responseLogger ResponseLogger) *client {
 

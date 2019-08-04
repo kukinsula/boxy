@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	loginEntity "github.com/kukinsula/boxy/entity/login"
 	redisFramework "github.com/kukinsula/boxy/framework/redis"
 	loginUsecase "github.com/kukinsula/boxy/usecase/login"
 )
@@ -20,68 +19,57 @@ func NewLogin(client *redisFramework.Client) *Login {
 func (login *Login) Signin(
 	uuid string,
 	context context.Context,
-	params loginUsecase.SigninParams) (*loginEntity.User, error) {
+	params loginUsecase.SigninParams) (*loginUsecase.SigninResult, error) {
 
-	user := &loginEntity.User{}
-
-	err := login.Request(redisFramework.Request{
+	result := &loginUsecase.SigninResult{}
+	err := login.Request(&redisFramework.Request{
 		UUID:    uuid,
 		Context: context,
 		Channel: redisFramework.LOGIN_SIGNIN,
 		Params:  params,
-		Result:  user,
 		Ping:    time.Minute,
-	})
+	}).Decode(result)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return user, nil
+	return result, nil
 }
 
 func (login *Login) Me(
 	uuid string,
 	context context.Context,
-	token string) (*loginEntity.User, error) {
+	token string) (*loginUsecase.SigninResult, error) {
 
-	user := &loginEntity.User{}
-
-	err := login.Request(redisFramework.Request{
+	result := &loginUsecase.SigninResult{}
+	err := login.Request(&redisFramework.Request{
 		UUID:    uuid,
 		Context: context,
 		Channel: redisFramework.LOGIN_ME,
-		Params:  token,
-		Result:  user,
+		Params:  &loginUsecase.AccessTokenParams{Token: token},
 		Ping:    time.Minute,
-	})
+	}).Decode(result)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return user, nil
+	return result, nil
 }
 
 func (login *Login) Logout(
 	uuid string,
 	context context.Context,
-	token string) (*loginEntity.User, error) {
+	token string) error {
 
-	user := &loginEntity.User{}
-
-	err := login.Request(redisFramework.Request{
+	resp := login.Request(&redisFramework.Request{
 		UUID:    uuid,
 		Context: context,
 		Channel: redisFramework.LOGIN_LOGOUT,
-		Params:  token,
-		Result:  user,
+		Params:  &loginUsecase.AccessTokenParams{Token: token},
 		Ping:    time.Minute,
 	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return resp.Error
 }
