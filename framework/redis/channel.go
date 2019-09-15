@@ -3,9 +3,12 @@ package redis
 type Channel string
 
 const (
-	METRICS = Channel("metrics")
+	STREAMING = Channel("streaming")
 
-	LOGIN_SIGNIN = Channel("login.signin")
-	LOGIN_ME     = Channel("login.me")
-	LOGIN_LOGOUT = Channel("login.logout")
+	LOGIN_SIGNUP         = Channel("login.signup")
+	LOGIN_CHECK_ACTIVATE = Channel("login.check_activate")
+	LOGIN_ACTIVATE       = Channel("login.activate")
+	LOGIN_SIGNIN         = Channel("login.signin")
+	LOGIN_ME             = Channel("login.me")
+	LOGIN_LOGOUT         = Channel("login.logout")
 )

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	_ "fmt"
 	"time"
 
 	"github.com/kukinsula/boxy/entity"
@@ -27,32 +28,6 @@ type Client struct {
 	pool   *redis.Pool
 	codec  codec.Codec
 	logger log.Logger
-}
-
-type Request struct {
-	UUID    string
-	Context context.Context
-	Channel Channel
-	Ping    time.Duration
-	Params  interface{}
-}
-
-type Response struct {
-	Request *Request
-	data    []byte
-	Error   error
-	codec   codec.Codec
-	logger  log.Logger
-}
-
-type Handler struct {
-	Channel Channel
-	Params  Reseter // interface{}
-	Handle  func(uuid string, ctx context.Context) (interface{}, error)
-}
-
-type Reseter interface {
-	Reset() error
 }
 
 func NewClient(config Config) (*Client, error) {
@@ -98,13 +73,42 @@ func (client *Client) Publish(channel Channel, v interface{}) error {
 	return err
 }
 
+func (client *Client) Subscribe(
+	ctx context.Context,
+	channel Channel,
+	ping time.Duration) *Subscription {
+
+	subscription := NewSusbcription(ctx, channel, ping)
+	conn := client.pool.Get()
+
+	go subscription.Start(conn)
+
+	return subscription
+}
+
+type Request struct {
+	UUID    string
+	Context context.Context
+	Channel Channel
+	Ping    time.Duration
+	Params  interface{}
+}
+
+type Response struct {
+	Request *Request
+	data    []byte
+	Error   error
+	codec   codec.Codec
+	logger  log.Logger
+}
+
 func (client *Client) Request(req *Request) *Response {
 	start := time.Now()
 	failure := make(chan error)
 	conn := client.pool.Get()
 	ctx, cancel := context.WithCancel(req.Context)
 	resp := &Response{Request: req, codec: client.codec, logger: client.logger}
-	subscription := NewSusbcription(req.UUID, ctx, Channel(req.UUID), req.Ping)
+	subscription := NewSusbcription(ctx, Channel(req.UUID), req.Ping)
 
 	go func() {
 		failure <- subscription.Start(conn)
@@ -130,8 +134,7 @@ func (client *Client) Request(req *Request) *Response {
 		}
 	}
 
-	client.logger(subscription.UUID, log.DEBUG,
-		"REDIS request finished",
+	client.logger(req.UUID, log.DEBUG, "REDIS request finished",
 		map[string]interface{}{
 			"channel":  subscription.channel,
 			"duration": time.Since(start),
@@ -170,69 +173,80 @@ func (client *Client) sendRequest(req *Request) error {
 	return err
 }
 
-func (client *Client) Handle(handler *Handler) (err error) {
+type Handler interface {
+	Params() interface{}
+	Exec(uuid string, ctx context.Context) (interface{}, error)
+}
+
+type HandlerBuilder func() Handler
+
+func (client *Client) Handle(channel Channel, builder HandlerBuilder) (err error) {
 	conn := client.pool.Get()
 
 	for err == nil {
-		values, err := redis.Values(conn.Do("BLPOP", string(handler.Channel), 0))
+		values, err := redis.Values(conn.Do("BLPOP", string(channel), 0))
 		if err != nil {
 			break
 		}
 
-		var tmp string
-		var raw []byte
+		go func() {
+			var tmp string
+			var raw []byte
 
-		// Scan the BLOP received request
-		_, err = redis.Scan(values, &tmp, &raw)
-		if err != nil {
-			break
-		}
+			// Scan the BLOP received request
+			_, err = redis.Scan(values, &tmp, &raw)
+			if err != nil {
+				return
+			}
 
-		// Extract the reponse ID from raw payload
-		requestId, err := entity.FromBytes(raw[:responseIdLen])
-		if err != nil {
-			break
-		}
+			// Extract the reponse ID from raw payload
+			requestId, err := entity.FromBytes(raw[:responseIdLen])
+			if err != nil {
+				return
+			}
 
-		err = handler.Params.Reset()
-		if err != nil {
-			break
-		}
+			handler := builder()
+			params := handler.Params()
 
-		// Decode request parameters
-		err = client.codec.Decode(raw[responseIdLen:], handler.Params)
+			// Decode request parameters
+			err = client.codec.Decode(raw[responseIdLen:], params)
 
-		client.logger(requestId, log.DEBUG,
-			"REDIS BLOP received a request to handle",
-			map[string]interface{}{
-				"channel": handler.Channel,
-				"params":  handler.Params,
-				"error":   err,
-			})
+			client.logger(requestId, log.DEBUG,
+				"REDIS BLOP received a request to handle",
+				map[string]interface{}{
+					"channel": channel,
+					"params":  params,
+					"error":   err,
+				})
 
-		if err != nil {
-			break
-		}
+			if err != nil {
+				return
+			}
 
-		// Execute the handler
-		result, err := handler.Handle(requestId, context.Background())
-		if err != nil {
-			break
-		}
+			// Execute the handler
+			var body interface{}
+			result, err := handler.Exec(requestId, context.Background())
+			if err == nil {
+				body = result
+			} else {
+				body = err
+			}
 
-		// Send the response
-		err = client.Publish(Channel(string(requestId)), result)
+			// Send the response
+			err = client.Publish(Channel(string(requestId)), body)
 
-		client.logger(requestId, log.DEBUG, "REDIS PUBLISH response",
-			map[string]interface{}{
-				"channel": handler.Channel,
-				"result":  result,
-				"error":   err,
-			})
+			client.logger(requestId, log.DEBUG,
+				"REDIS PUBLISH response",
+				map[string]interface{}{
+					"channel": channel,
+					"result":  result,
+					"error":   err,
+				})
 
-		if err != nil {
-			break
-		}
+			if err != nil {
+				return
+			}
+		}()
 	}
 
 	conn.Close()

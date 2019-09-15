@@ -167,12 +167,14 @@ func (model *UserModel) Update(
 	uuid string,
 	ctx context.Context,
 	conditions map[string]interface{},
-	update map[string]interface{}) error {
+	update map[string]interface{}) (*loginEntity.User, error) {
 
-	_, err := model.UpdateOne(uuid, ctx, conditions, update)
+	user := &loginEntity.User{}
+
+	err := model.UpdateOne(uuid, ctx, conditions, update, user)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return user, nil
 }

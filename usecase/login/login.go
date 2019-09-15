@@ -43,7 +43,7 @@ type LoginGateway interface {
 		uuid string,
 		ctx context.Context,
 		conditions map[string]interface{},
-		update map[string]interface{}) error
+		update map[string]interface{}) (*loginEntity.User, error)
 }
 
 type Login struct {
@@ -71,6 +71,11 @@ type CreateUserParams struct {
 	LastName  string `json:"lastName"`
 }
 
+func (params *CreateUserParams) String() string {
+	return fmt.Sprintf("Email: %s, Password: ******, FirstName: %s, LastName: %s",
+		params.Email, params.FirstName, params.LastName)
+}
+
 type InitializeParams struct {
 	Email    string `json:"email"`
 	Token    string `json:"token"`
@@ -80,7 +85,7 @@ type InitializeParams struct {
 func (login *Login) Signup(
 	uuid string,
 	ctx context.Context,
-	params CreateUserParams) (*loginEntity.User, error) {
+	params *CreateUserParams) (*loginEntity.User, error) {
 
 	token, err := login.tokener.Generate(usecase.GenerateTokenParams{
 		Audience:  "Users",
@@ -113,25 +118,35 @@ func (login *Login) Signup(
 	return login.loginGateway.Create(uuid, ctx, user)
 }
 
-func (login *Login) CheckActivation(
+type EmailAndTokenParams struct {
+	Email string `form:"email"`
+	Token string `form:"token"`
+}
+
+func (params *EmailAndTokenParams) String() string {
+	return fmt.Sprintf("Email: %s, Token: %s", params.Email, params.Token)
+}
+
+func (login *Login) CheckActivate(
 	uuid string,
 	ctx context.Context,
-	email, token string) error {
+	params *EmailAndTokenParams) error {
 
-	_, err := login.tokener.Verify(token)
+	_, err := login.tokener.Verify(params.Token)
 	if err != nil {
 		return err
 	}
 
 	user, err := login.loginGateway.FindByEmailAndActivationToken(
-		uuid, ctx, email, token, map[string]interface{}{})
+		uuid, ctx, params.Email, params.Token, map[string]interface{}{})
 
 	if err != nil {
 		return err
 	}
 
 	if user == nil {
-		return fmt.Errorf("CheckActivation failed: cannot find User with token %s", token)
+		return fmt.Errorf("CheckActivation failed: cannot find User with token %s",
+			params.Token)
 	}
 
 	return nil
@@ -140,48 +155,37 @@ func (login *Login) CheckActivation(
 func (login *Login) Activate(
 	uuid string,
 	ctx context.Context,
-	email, token string) error {
+	params *EmailAndTokenParams) error {
 
-	_, err := login.tokener.Verify(token)
+	_, err := login.tokener.Verify(params.Token)
 	if err != nil {
 		return err
 	}
 
 	user, err := login.loginGateway.FindByEmailAndActivationToken(uuid, ctx,
-		email, token, map[string]interface{}{"uuid": 1})
+		params.Email, params.Token, map[string]interface{}{"uuid": 1})
 
 	if err != nil {
 		return err
 	}
 
 	if user == nil {
-		return fmt.Errorf("Activate failed: cannot find User with email %s", email)
+		return fmt.Errorf("Activate failed: cannot find User with email %s", params.Email)
 	}
 
-	err = login.loginGateway.Update(uuid, ctx,
+	_, err = login.loginGateway.Update(uuid, ctx,
 		map[string]interface{}{"uuid": user.UUID},
 		map[string]interface{}{
 			"$set":   map[string]interface{}{"state": loginEntity.VALID},
 			"$unset": map[string]interface{}{"activationToken": 1},
 		})
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 type SigninParams struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
-}
-
-func (params *SigninParams) Reset() error {
-	params.Email = ""
-	params.Password = ""
-
-	return nil
 }
 
 func (params *SigninParams) String() string {
@@ -208,11 +212,7 @@ func (login *Login) Signin(
 
 	user, err := login.loginGateway.FindByEmail(uuid, ctx, params.Email,
 		map[string]interface{}{
-			"uuid":      1,
-			"email":     1,
-			"firstName": 1,
-			"lastName":  1,
-			"password":  1,
+			"uuid": 1, "email": 1, "firstName": 1, "lastName": 1, "password": 1,
 		})
 
 	if err != nil {
@@ -228,22 +228,17 @@ func (login *Login) Signin(
 		return nil, err
 	}
 
-	if user.AccessToken != "" {
+	generate := false
+	if user.AccessToken == "" {
+		generate = true
+	} else {
 		_, err = login.tokener.Verify(user.AccessToken)
 		if err != nil {
-			user.AccessToken, err = login.tokener.Generate(usecase.GenerateTokenParams{
-				Audience:  "Users",
-				ExpiresIn: time.Hour * 24,
-				Issuer:    "Login",
-				Subject:   "Signin",
-				Email:     params.Email,
-			})
-
-			if err != nil {
-				return nil, err
-			}
+			generate = true
 		}
-	} else {
+	}
+
+	if generate {
 		user.AccessToken, err = login.tokener.Generate(usecase.GenerateTokenParams{
 			Audience:  "Users",
 			ExpiresIn: time.Hour * 24,
@@ -257,7 +252,7 @@ func (login *Login) Signin(
 		}
 	}
 
-	err = login.loginGateway.Update(uuid, ctx,
+	_, err = login.loginGateway.Update(uuid, ctx,
 		map[string]interface{}{"uuid": user.UUID},
 		map[string]interface{}{"$set": map[string]interface{}{
 			"accessToken": user.AccessToken,
@@ -280,10 +275,8 @@ type AccessTokenParams struct {
 	Token string `json:"token"`
 }
 
-func (params *AccessTokenParams) Reset() error {
-	params.Token = ""
-
-	return nil
+func (params *AccessTokenParams) String() string {
+	return params.Token
 }
 
 func (login *Login) Me(
@@ -297,12 +290,7 @@ func (login *Login) Me(
 	}
 
 	user, err := login.loginGateway.FindByAccessToken(uuid, ctx, params.Token,
-		map[string]interface{}{
-			"uuid":      1,
-			"email":     1,
-			"firstName": 1,
-			"lastName":  1,
-		})
+		map[string]interface{}{"uuid": 1, "email": 1, "firstName": 1, "lastName": 1})
 
 	if err != nil {
 		return nil, err
@@ -374,7 +362,9 @@ func (login *Login) CheckInitialization(
 	}
 
 	if user == nil {
-		return fmt.Errorf("CheckInitialization failed: cannot find user with email %s and initialization token %s", email, token)
+		return fmt.Errorf(
+			"CheckInitialization failed: cannot find user with email %s and initialization token %s",
+			email, token)
 	}
 
 	return nil
@@ -398,7 +388,8 @@ func (login *Login) Initialize(
 	}
 
 	if user == nil {
-		return nil, fmt.Errorf("Initialize failed: cannot find user with email %s and initialization token %s",
+		return nil, fmt.Errorf(
+			"Initialize failed: cannot find user with email %s and initialization token %s",
 			params.Email, params.Token)
 	}
 
@@ -407,7 +398,7 @@ func (login *Login) Initialize(
 		return nil, err
 	}
 
-	err = login.loginGateway.Update(uuid, ctx,
+	user, err = login.loginGateway.Update(uuid, ctx,
 		map[string]interface{}{"uuid": user.UUID},
 		map[string]interface{}{
 			"$set": map[string]interface{}{
@@ -448,7 +439,7 @@ func (login *Login) Logout(
 			params.Token)
 	}
 
-	err = login.loginGateway.Update(uuid, ctx,
+	_, err = login.loginGateway.Update(uuid, ctx,
 		map[string]interface{}{"uuid": user.UUID},
 		map[string]interface{}{"$unset": map[string]interface{}{"accessToken": 1}})
 

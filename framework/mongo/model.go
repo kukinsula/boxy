@@ -101,7 +101,9 @@ func (model *model) FindOne(
 	result interface{}) error {
 
 	opts := &options.FindOneOptions{Projection: projection}
-	err := model.collection.FindOne(ctx, conditions, opts).Decode(result)
+	err := model.collection.
+		FindOne(ctx, conditions, opts).
+		Decode(result)
 
 	model.params.Logger(uuid, log.DEBUG,
 		fmt.Sprintf("%s.FindOne", model.params.Name),
@@ -120,15 +122,15 @@ func (model *model) UpdateOne(
 	ctx context.Context,
 	conditions map[string]interface{},
 	update map[string]interface{},
-	opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+	result interface{},
+	opts ...*options.FindOneAndUpdateOptions) error {
 
-	result, err := model.collection.UpdateOne(ctx, conditions, update, opts...)
+	err := model.collection.
+		FindOneAndUpdate(ctx, conditions, update, opts...).
+		Decode(result)
+
 	if err != nil {
-		return nil, err
-	}
-
-	if result.MatchedCount != 1 || result.ModifiedCount != 1 {
-		return nil, fmt.Errorf("Model.UpdateOne failed: wrong number of Matched or Modified counts")
+		return err
 	}
 
 	model.params.Logger(uuid, log.DEBUG,
@@ -139,7 +141,7 @@ func (model *model) UpdateOne(
 			"result":     result,
 		})
 
-	return result, nil
+	return nil
 }
 
 func (model *model) DeleteOne(

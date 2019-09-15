@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 
+	loginEntity "github.com/kukinsula/boxy/entity/login"
 	loginUsecase "github.com/kukinsula/boxy/usecase/login"
 )
 
@@ -25,8 +26,83 @@ func NewLogin(
 	}
 }
 
+func (login *Login) Signup(
+	uuid string, params *loginUsecase.CreateUserParams) (*loginEntity.User, error) {
+
+	result := &loginEntity.User{}
+	resp, err := login.POST(&Request{
+		UUID: uuid,
+		Path: "/login/signup",
+		Headers: map[string][]string{
+			"Encoding-Type": []string{"application/json"},
+		},
+		Body: map[string]interface{}{
+			"email":     params.Email,
+			"password":  params.Password,
+			"firstName": params.FirstName,
+			"lastName":  params.LastName,
+		},
+	}).Decode(result)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Status != 201 {
+		return nil, fmt.Errorf("Signup should return Status code 201, not %d", resp.Status)
+	}
+
+	return result, nil
+}
+
+func (login *Login) CheckActivate(uuid string, params *loginUsecase.EmailAndTokenParams) error {
+	resp := login.GET(&Request{
+		UUID: uuid,
+		Path: "/login/activate",
+		Query: map[string]interface{}{
+			"email": params.Email,
+			"token": params.Token,
+		},
+	})
+
+	if resp.Error != nil {
+		return resp.Error
+	}
+
+	if resp.Status != 204 {
+		return fmt.Errorf(
+			"CheckActivation should return Status code 204, not %d", resp.Status)
+	}
+
+	return nil
+}
+
+func (login *Login) Activate(uuid string, params *loginUsecase.EmailAndTokenParams) error {
+	resp := login.POST(&Request{
+		UUID: uuid,
+		Path: "/login/activate",
+		Headers: map[string][]string{
+			"Encoding-Type": []string{"application/json"},
+		},
+		Body: map[string]interface{}{
+			"email": params.Email,
+			"token": params.Token,
+		},
+	})
+
+	if resp.Error != nil {
+		return resp.Error
+	}
+
+	if resp.Status != 204 {
+		return fmt.Errorf("Signup should return Status code 204, not %d", resp.Status)
+	}
+
+	return nil
+}
+
 func (login *Login) Signin(
-	uuid, email, password string) (*loginUsecase.SigninResult, error) {
+	uuid string, params *loginUsecase.SigninParams) (*loginUsecase.SigninResult, error) {
 
 	result := &loginUsecase.SigninResult{}
 	resp, err := login.POST(&Request{
@@ -36,8 +112,8 @@ func (login *Login) Signin(
 			"Encoding-Type": []string{"application/json"},
 		},
 		Body: map[string]interface{}{
-			"email":    email,
-			"password": password,
+			"email":    params.Email,
+			"password": params.Password,
 		},
 	}).Decode(result)
 
@@ -58,7 +134,7 @@ func (login *Login) Me(uuid, token string) (*loginUsecase.SigninResult, error) {
 		UUID: uuid,
 		Path: "/login/me",
 		Headers: map[string][]string{
-			"X-Access-Token": []string{token},
+			"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
 		},
 	}).Decode(result)
 
@@ -78,7 +154,7 @@ func (login *Login) Logout(uuid, token string) error {
 		UUID: uuid,
 		Path: "/login/logout",
 		Headers: map[string][]string{
-			"X-Access-Token": []string{token},
+			"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
 		},
 	})
 

@@ -28,7 +28,9 @@ func main() {
 	}
 
 	gateway := redisClient.NewMonitoring(client)
-	monitoring := monitoringUsecase.NewMonitoring(gateway)
+	monitoring := monitoringUsecase.NewMonitoring(gateway, logger)
+
+	fmt.Println("Monitoring...")
 
 	monitoring.Start()
 }

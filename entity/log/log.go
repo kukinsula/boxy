@@ -11,10 +11,10 @@ import (
 
 type Level string
 
-const DEBUG = Level("debug")
-const INFO = Level("info")
-const WARN = Level("warn")
-const ERROR = Level("error")
+const DEBUG = Level("DEBUG")
+const INFO = Level("INFO")
+const WARN = Level("WARN")
+const ERROR = Level("ERROR")
 
 type Log struct {
 	Date    time.Time              `json:"date"`
@@ -43,8 +43,8 @@ func WriterLogger(writer io.Writer) Logger {
 		message string,
 		meta map[string]interface{}) error {
 
-		_, err := fmt.Fprintf(writer, "%s [%s] %s %v\n",
-			time.Now().Format(time.RFC3339), uuid, message, meta)
+		_, err := fmt.Fprintf(writer, "%s [%s] %s %s %v\n",
+			time.Now().Format(time.RFC3339), uuid, level, message, meta)
 
 		return err
 	}

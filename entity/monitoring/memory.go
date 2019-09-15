@@ -74,49 +74,41 @@ func (memory *Memory) PercentVmallocOccupied() float64 {
 func (memory *Memory) String() string {
 	format := "\t========== MEMORY ==========\n\n"
 	format += "MemTotal:\t %s\n"
-	format += "MemFree:\t %s\t%.3f %%\t(%s)\n"
-	format += "MemOccupied:\t %s\t%.3f %%\t(%s)\n"
-	format += "MemAvailable:\t %s\t\t\t(%s)\n"
+	format += "MemFree:\t %s\t%.3f %%\n"
+	format += "MemOccupied:\t %s\t%.3f %%\n"
+	format += "MemAvailable:\t %s\n"
 	format += "SwapTotal:\t %s\n"
-	format += "SwapFree:\t %s\t%.3f %%\t(%s)\n"
-	format += "SwapOccupied:\t %s\t%.3f %%\t(%s)\n"
+	format += "SwapFree:\t %s\t%.3f %%\n"
+	format += "SwapOccupied:\t %s\t%.3f %%\n"
 	format += "VmallocTotal:\t %s\n"
-	format += "VmallocFree:\t %s\t%.3f %%\t(%s)\n"
-	format += "VmallocOccupied: %s\t%.3f %%\t\t(%s)"
+	format += "VmallocFree:\t %s\t%.3f %%\n"
+	format += "VmallocOccupied: %s\t%.3f %%"
 
 	return fmt.Sprintf(format,
 		memory.CurrentMeasure.MemTotal,
 
 		memory.CurrentMeasure.MemFree,
 		memory.PercentMemFree(),
-		memory.CurrentMeasure.MemFree-memory.lastMeasure.MemFree,
 
 		memory.CurrentMeasure.MemOccupied,
 		memory.PercentMemOccupied(),
-		memory.CurrentMeasure.MemOccupied-memory.lastMeasure.MemOccupied,
 
 		memory.CurrentMeasure.MemAvailable,
-		memory.CurrentMeasure.MemAvailable-memory.lastMeasure.MemAvailable,
-
 		memory.CurrentMeasure.SwapTotal,
 
 		memory.CurrentMeasure.SwapFree,
 		memory.PercentSwapFree(),
-		memory.CurrentMeasure.SwapFree-memory.lastMeasure.SwapFree,
 
 		memory.CurrentMeasure.SwapOccupied,
 		memory.PercentSwapOccupied(),
-		memory.CurrentMeasure.SwapOccupied-memory.lastMeasure.SwapOccupied,
 
 		memory.CurrentMeasure.VmallocTotal,
 
 		memory.CurrentMeasure.VmallocFree,
 		memory.PercentVmallocFree(),
-		memory.CurrentMeasure.VmallocFree-memory.lastMeasure.VmallocFree,
 
 		memory.CurrentMeasure.VmallocOccupied,
-		memory.PercentVmallocOccupied(),
-		memory.CurrentMeasure.VmallocOccupied-memory.lastMeasure.VmallocOccupied)
+		memory.PercentVmallocOccupied())
 }
 
 func (measure *MemoryMeasure) update() error {

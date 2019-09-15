@@ -11,6 +11,19 @@ type Metrics struct {
 	Network *Network `json:"net"`
 }
 
+func NewMetrics() *Metrics {
+	return &Metrics{
+		CPU:     &CPU{},
+		Memory:  &Memory{},
+		Network: &Network{},
+	}
+}
+
+func (metrics *Metrics) String() string {
+	return fmt.Sprintf("%s\n%s\n%s",
+		metrics.CPU, metrics.Memory, metrics.Network)
+}
+
 func checkSscanf(field string, err error, n, expected int) error {
 	if err != nil {
 		return fmt.Errorf("Sscanf '%s' failed: %s", field, err)

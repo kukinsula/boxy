@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	loginEntity "github.com/kukinsula/boxy/entity/login"
 	redisFramework "github.com/kukinsula/boxy/framework/redis"
 	loginUsecase "github.com/kukinsula/boxy/usecase/login"
 )
@@ -16,10 +17,59 @@ func NewLogin(client *redisFramework.Client) *Login {
 	return &Login{Client: client}
 }
 
+func (login *Login) Signup(
+	uuid string,
+	context context.Context,
+	params *loginUsecase.CreateUserParams) (*loginEntity.User, error) {
+
+	result := &loginEntity.User{}
+	err := login.Request(&redisFramework.Request{
+		UUID:    uuid,
+		Context: context,
+		Channel: redisFramework.LOGIN_SIGNUP,
+		Params:  params,
+		Ping:    time.Minute,
+	}).Decode(result)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (login *Login) CheckActivate(
+	uuid string,
+	context context.Context,
+	params *loginUsecase.EmailAndTokenParams) error {
+
+	return login.Request(&redisFramework.Request{
+		UUID:    uuid,
+		Context: context,
+		Channel: redisFramework.LOGIN_CHECK_ACTIVATE,
+		Params:  params,
+		Ping:    time.Minute,
+	}).Error
+}
+
+func (login *Login) Activate(
+	uuid string,
+	context context.Context,
+	params *loginUsecase.EmailAndTokenParams) error {
+
+	return login.Request(&redisFramework.Request{
+		UUID:    uuid,
+		Context: context,
+		Channel: redisFramework.LOGIN_ACTIVATE,
+		Params:  params,
+		Ping:    time.Minute,
+	}).Error
+}
+
 func (login *Login) Signin(
 	uuid string,
 	context context.Context,
-	params loginUsecase.SigninParams) (*loginUsecase.SigninResult, error) {
+	params *loginUsecase.SigninParams) (*loginUsecase.SigninResult, error) {
 
 	result := &loginUsecase.SigninResult{}
 	err := login.Request(&redisFramework.Request{

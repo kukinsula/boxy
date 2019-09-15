@@ -89,13 +89,12 @@ func (cpu *CPU) String() string {
 	str := "\t========== CPU ==========\n\n"
 	str += fmt.Sprintf("CPU: \t\t%.2f %%\n", cpu.LoadAverage)
 
-	for index, data := range cpu.LoadAverages {
-		str += fmt.Sprintf("CPU%d: \t\t%.2f %%\n", index, data)
+	for index, average := range cpu.LoadAverages {
+		str += fmt.Sprintf("CPU%d: \t\t%.2f %%\n", index, average)
 	}
 
-	str += fmt.Sprintf("\nSwitchContexts: \t\t%d (%d)\n",
-		cpu.CurrentMeasure.SwitchContexts,
-		cpu.CurrentMeasure.SwitchContexts-cpu.previousMeasure.SwitchContexts)
+	str += fmt.Sprintf("\nSwitchContexts: \t\t%d\n",
+		cpu.CurrentMeasure.SwitchContexts)
 
 	str += fmt.Sprintf("BootTime: \t%d (%v)\n",
 		cpu.CurrentMeasure.BootTime, time.Unix(cpu.CurrentMeasure.BootTime, 0))

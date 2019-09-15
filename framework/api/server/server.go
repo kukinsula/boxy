@@ -52,10 +52,33 @@ func NewAPI(config Config) *API {
 func (api *API) Run() {
 	api.engine.Use(Welcome(api.logger))
 
-	// Login
-	api.engine.POST("/login/signin", Signin(api.backend.Login))
-	api.engine.GET("/login/me", Me(api.backend.Login))
-	api.engine.DELETE("/login/logout", Logout(api.backend.Login))
+	public := api.engine.Group("/")
+	{
+		public.POST("/login/signup",
+			Signup(api.backend.Login))
+
+		public.GET("/login/activate",
+			CheckActivate(api.backend.Login))
+
+		public.POST("/login/activate",
+			Activate(api.backend.Login))
+
+		api.engine.POST("/login/signin",
+			Signin(api.backend.Login))
+	}
+
+	private := api.engine.Group("/")
+	private.Use(Authenticate(api.backend.Login, api.logger))
+	{
+		private.GET("/login/me",
+			Me(api.backend.Login))
+
+		private.DELETE("/login/logout",
+			Logout(api.backend.Login))
+
+		private.GET("/streaming",
+			Streaming(context.TODO(), api.backend.Streaming))
+	}
 
 	api.engine.Run(api.config.Address)
 }

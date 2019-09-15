@@ -3,6 +3,8 @@ package monitoring
 import (
 	"time"
 
+	"github.com/kukinsula/boxy/entity"
+	"github.com/kukinsula/boxy/entity/log"
 	monitoringEntity "github.com/kukinsula/boxy/entity/monitoring"
 )
 
@@ -16,15 +18,17 @@ type Monitoring struct {
 	cpu               *monitoringEntity.CPU
 	memory            *monitoringEntity.Memory
 	network           *monitoringEntity.Network
+	logger            log.Logger
 }
 
-func NewMonitoring(monitoringGateway MonitoringGateway) *Monitoring {
+func NewMonitoring(monitoringGateway MonitoringGateway, logger log.Logger) *Monitoring {
 	return &Monitoring{
 		Interval:          1,
 		monitoringGateway: monitoringGateway,
 		cpu:               monitoringEntity.NewCPU(),
 		memory:            monitoringEntity.NewMemory(),
 		network:           monitoringEntity.NewNetwork(),
+		logger:            logger,
 	}
 }
 
@@ -34,6 +38,13 @@ func (monitoring *Monitoring) Start() error {
 		if err != nil {
 			return err
 		}
+
+		monitoring.logger(entity.NewUUID(), log.DEBUG, "New Metrics calculated",
+			map[string]interface{}{
+				"CPU":     metrics.CPU,
+				"Memory":  metrics.Memory,
+				"Network": metrics.Network,
+			})
 
 		err = monitoring.monitoringGateway.Send(metrics)
 		if err != nil {

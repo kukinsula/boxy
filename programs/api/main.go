@@ -30,8 +30,9 @@ func main() {
 		return
 	}
 
-	service := redisClient.NewService(client)
-	backend := server.NewBackend(service.Login)
+	login := redisClient.NewLogin(client)
+	streaming := redisClient.NewStreaming(client)
+	backend := server.NewBackend(login, streaming)
 	api := server.NewAPI(server.Config{
 		Address: "127.0.0.1:9000",
 		Backend: backend,

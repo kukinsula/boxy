@@ -60,7 +60,10 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
+	go redisServer.HandleSignup(client, login)
 	go redisServer.HandleSignin(client, login)
+	go redisServer.HandleCheckActivate(client, login)
+	go redisServer.HandleActivate(client, login)
 	go redisServer.HandleMe(client, login)
 	go redisServer.HandleLogout(client, login)
 

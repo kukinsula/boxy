@@ -36,7 +36,7 @@ type User struct {
 	ActivationToken     string    `json:"activation-token" bson:"activationToken"`
 	InitializationToken string    `json:"initialization-token" bson:"initializationToken"`
 	State               UserState `json:"state" bson:"state"`
-	Password            string    `bson:"password"`
+	Password            string    `json:"-" bson:"password"`
 }
 
 func NewUser(uuid,

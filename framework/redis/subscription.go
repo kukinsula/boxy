@@ -8,7 +8,6 @@ import (
 )
 
 type Subscription struct {
-	UUID       string
 	Context    context.Context
 	channel    Channel
 	ping       time.Duration
@@ -17,13 +16,11 @@ type Subscription struct {
 }
 
 func NewSusbcription(
-	uuid string,
 	ctx context.Context,
 	channel Channel,
 	ping time.Duration) *Subscription {
 
 	return &Subscription{
-		UUID:       uuid,
 		Context:    ctx,
 		channel:    channel,
 		ping:       ping,
@@ -71,7 +68,10 @@ func (subscription *Subscription) Start(conn redis.Conn) error {
 	return err
 }
 
-func (subscription *Subscription) receive(pubsub redis.PubSubConn, done chan struct{}) (err error) {
+func (subscription *Subscription) receive(
+	pubsub redis.PubSubConn,
+	done chan struct{}) (err error) {
+
 	for goOn := true; goOn; goOn = goOn && err == nil {
 		switch result := pubsub.Receive().(type) {
 		case error:
