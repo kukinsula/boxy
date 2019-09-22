@@ -82,7 +82,7 @@ func (memory *Memory) String() string {
 	format += "SwapOccupied:\t %s\t%.3f %%\n"
 	format += "VmallocTotal:\t %s\n"
 	format += "VmallocFree:\t %s\t%.3f %%\n"
-	format += "VmallocOccupied: %s\t%.3f %%"
+	format += "VmallocOccupied: %s\t%.3f %%\n"
 
 	return fmt.Sprintf(format,
 		memory.CurrentMeasure.MemTotal,

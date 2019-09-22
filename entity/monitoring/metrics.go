@@ -20,7 +20,7 @@ func NewMetrics() *Metrics {
 }
 
 func (metrics *Metrics) String() string {
-	return fmt.Sprintf("%s\n%s\n%s",
+	return fmt.Sprintf("%s%s%s",
 		metrics.CPU, metrics.Memory, metrics.Network)
 }
 

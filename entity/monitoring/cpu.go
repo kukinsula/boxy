@@ -105,7 +105,7 @@ func (cpu *CPU) String() string {
 	str += fmt.Sprintf("ProcessorsBlocked: \t%d\n",
 		cpu.CurrentMeasure.ProcessorsBlocked)
 
-	str += fmt.Sprintf("ProcessorsRunning: \t%d",
+	str += fmt.Sprintf("ProcessorsRunning: \t%d\n",
 		cpu.CurrentMeasure.ProcessorsRunning)
 
 	return str
